@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ответы отправлены</title>
+    <link rel="stylesheet" href="{% static 'api/styles.css' %}">
+</head>
+<body>
+    <div class="page-shell page-shell-narrow">
+        <main class="success-card">
+            <div class="success-icon">✓</div>
+            <p class="eyebrow">Опрос успешно отправлен</p>
+            <h1>Спасибо за прохождение анкеты</h1>
+            <p>
+                Ваши ответы по опросу <strong>«{{ survey.title }}»</strong> сохранены в базе данных.
+                {% if submission_id %}Номер прохождения: <code>{{ submission_id }}</code>.{% endif %}
+            </p>
+            <div class="hero-actions">
+                <a class="button button-primary" href="/">Вернуться на главную</a>
+                <a class="button button-secondary" href="/surveys/{{ survey.slug }}/">Заполнить снова</a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

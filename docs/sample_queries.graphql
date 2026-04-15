@@ -1,0 +1,43 @@
+query Surveys {
+  surveys(activeOnly: true) {
+    id
+    title
+    slug
+    isActive
+  }
+}
+
+query OneSurvey {
+  surveyBySlug(slug: "customer-satisfaction") {
+    id
+    title
+    description
+    questions {
+      id
+      title
+      questionType
+      isRequired
+      choices {
+        id
+        text
+        value
+      }
+    }
+  }
+}
+
+query Stats {
+  questionStatistics(surveySlug: "customer-satisfaction") {
+    questionId
+    title
+    questionType
+    totalAnswers
+    choiceStats {
+      label
+      count
+    }
+    averageNumber
+    trueCount
+    falseCount
+  }
+}

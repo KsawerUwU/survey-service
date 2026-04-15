@@ -1,0 +1,63 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сервис опросов</title>
+    <link rel="stylesheet" href="{% static 'api/styles.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero-card">
+            <div>
+                <p class="eyebrow">Survey Service • Django + Strawberry GraphQL</p>
+                <h1>Сервис опросов</h1>
+                <p class="hero-text">
+                    Веб-интерфейс для обычных пользователей и GraphQL API для интеграций.
+                    Администратор создаёт анкеты в панели Django Admin, а респондент заполняет их через обычную страницу сайта.
+                </p>
+            </div>
+            <div class="hero-actions">
+                <a class="button button-primary" href="/admin/">Войти в админку</a>
+                <a class="button button-secondary" href="/graphql/">Открыть GraphiQL</a>
+            </div>
+        </header>
+
+        <main>
+            <section class="section-header">
+                <div>
+                    <h2>Доступные анкеты</h2>
+                    <p>Ниже отображаются только активные опросы, доступные для прохождения.</p>
+                </div>
+            </section>
+
+            {% if surveys %}
+                <div class="survey-grid">
+                    {% for survey in surveys %}
+                        <article class="survey-card">
+                            <div class="survey-card-top">
+                                <span class="tag">{{ survey.questions.count }} вопросов</span>
+                                <span class="tag tag-success">Активен</span>
+                            </div>
+                            <h3>{{ survey.title }}</h3>
+                            <p class="survey-description">{{ survey.description|default:"Описание не заполнено." }}</p>
+                            <div class="survey-meta">
+                                <span>Slug: <code>{{ survey.slug }}</code></span>
+                            </div>
+                            <div class="survey-card-actions">
+                                <a class="button button-primary" href="/surveys/{{ survey.slug }}/">Пройти опрос</a>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <h3>Активных опросов пока нет</h3>
+                    <p>Зайдите в Django Admin и создайте хотя бы одну анкету либо выполните команду <code>python manage.py seed_demo</code>.</p>
+                </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

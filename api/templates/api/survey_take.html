@@ -1,0 +1,253 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ survey.title }}</title>
+    <link rel="stylesheet" href="{% static 'api/styles.css' %}">
+</head>
+<body>
+    <div class="page-shell page-shell-narrow">
+        <header class="survey-header-card">
+            <a class="back-link" href="/">← Назад к списку анкет</a>
+            <h1>{{ survey.title }}</h1>
+            <p>{{ survey.description|default:"Заполните форму ниже и отправьте ответы." }}</p>
+            <div class="survey-meta-row">
+                <span class="tag">{{ survey.questions.count }} вопросов</span>
+                <span class="tag">GraphQL submit</span>
+                <span class="tag">Slug: {{ survey.slug }}</span>
+            </div>
+        </header>
+
+        <main>
+            <div id="submit-message" class="message-box hidden"></div>
+
+            <form id="survey-form" class="survey-form" novalidate>
+                <section class="form-card">
+                    <h2>Данные респондента</h2>
+                    <div class="field-grid">
+                        <label class="field-block">
+                            <span>Имя</span>
+                            <input type="text" id="respondent_name" name="respondent_name" placeholder="Например, Валерия">
+                        </label>
+                        <label class="field-block">
+                            <span>Email</span>
+                            <input type="email" id="respondent_email" name="respondent_email" placeholder="name@example.com">
+                        </label>
+                    </div>
+                </section>
+
+                {% for question in survey.questions.all %}
+                    <section class="form-card question-card" data-question-id="{{ question.id }}" data-question-type="{{ question.question_type }}" data-required="{{ question.is_required|yesno:'true,false' }}">
+                        <div class="question-head">
+                            <h2>{{ forloop.counter }}. {{ question.title }}</h2>
+                            {% if question.is_required %}
+                                <span class="required-badge">Обязательный</span>
+                            {% endif %}
+                        </div>
+
+                        {% if question.description %}
+                            <p class="question-description">{{ question.description }}</p>
+                        {% endif %}
+
+                        {% if question.question_type == 'single_choice' %}
+                            <div class="choice-list">
+                                {% for choice in question.choices.all %}
+                                    <label class="choice-item">
+                                        <input type="radio" name="question_{{ question.id }}" value="{{ choice.id }}">
+                                        <span>{{ choice.text }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        {% elif question.question_type == 'multiple_choice' %}
+                            <div class="choice-list">
+                                {% for choice in question.choices.all %}
+                                    <label class="choice-item">
+                                        <input type="checkbox" name="question_{{ question.id }}" value="{{ choice.id }}">
+                                        <span>{{ choice.text }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        {% elif question.question_type == 'text' %}
+                            <label class="field-block">
+                                <span>Текстовый ответ</span>
+                                <textarea name="question_{{ question.id }}" rows="5" placeholder="Введите ответ..."></textarea>
+                            </label>
+                        {% elif question.question_type == 'number' %}
+                            <label class="field-block">
+                                <span>Числовой ответ</span>
+                                <input type="number" step="0.01" name="question_{{ question.id }}" placeholder="Введите число">
+                            </label>
+                        {% elif question.question_type == 'boolean' %}
+                            <div class="choice-list choice-list-inline">
+                                <label class="choice-item">
+                                    <input type="radio" name="question_{{ question.id }}" value="true">
+                                    <span>Да</span>
+                                </label>
+                                <label class="choice-item">
+                                    <input type="radio" name="question_{{ question.id }}" value="false">
+                                    <span>Нет</span>
+                                </label>
+                            </div>
+                        {% endif %}
+                    </section>
+                {% endfor %}
+
+                <section class="form-actions">
+                    <button id="submit-button" class="button button-primary button-large" type="submit">Отправить ответы</button>
+                    <a class="button button-secondary" href="/graphql/">Открыть API в GraphiQL</a>
+                </section>
+            </form>
+        </main>
+    </div>
+
+    {{ survey.slug|json_script:"survey-slug" }}
+    <script>
+        const surveySlugValue = JSON.parse(document.getElementById('survey-slug').textContent);
+        const form = document.getElementById('survey-form');
+        const submitButton = document.getElementById('submit-button');
+        const messageBox = document.getElementById('submit-message');
+
+        function showMessage(text, type = 'error') {
+            messageBox.classList.remove('hidden', 'message-success', 'message-error');
+            messageBox.classList.add(type === 'success' ? 'message-success' : 'message-error');
+            messageBox.textContent = text;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function collectAnswers() {
+            const questionCards = document.querySelectorAll('.question-card');
+            const answers = [];
+
+            for (const card of questionCards) {
+                const questionId = card.dataset.questionId;
+                const questionType = card.dataset.questionType;
+                const isRequired = card.dataset.required === 'true';
+                let answer = { questionId: questionId };
+                let hasValue = false;
+
+                if (questionType === 'single_choice') {
+                    const checked = card.querySelector('input[type="radio"]:checked');
+                    if (checked) {
+                        answer.choiceIds = [checked.value];
+                        hasValue = true;
+                    }
+                } else if (questionType === 'multiple_choice') {
+                    const checked = Array.from(card.querySelectorAll('input[type="checkbox"]:checked'));
+                    if (checked.length > 0) {
+                        answer.choiceIds = checked.map(item => item.value);
+                        hasValue = true;
+                    }
+                } else if (questionType === 'text') {
+                    const textarea = card.querySelector('textarea');
+                    const value = textarea.value.trim();
+                    if (value) {
+                        answer.textValue = value;
+                        hasValue = true;
+                    }
+                } else if (questionType === 'number') {
+                    const input = card.querySelector('input[type="number"]');
+                    const value = input.value.trim();
+                    if (value !== '') {
+                        answer.numberValue = Number(value);
+                        hasValue = true;
+                    }
+                } else if (questionType === 'boolean') {
+                    const checked = card.querySelector('input[type="radio"]:checked');
+                    if (checked) {
+                        answer.booleanValue = checked.value === 'true';
+                        hasValue = true;
+                    }
+                }
+
+                if (isRequired && !hasValue) {
+                    throw new Error('Заполните обязательный вопрос: ' + card.querySelector('h2').textContent.trim());
+                }
+
+                if (hasValue) {
+                    answers.push(answer);
+                }
+            }
+
+            if (answers.length === 0) {
+                throw new Error('Нельзя отправить пустую форму.');
+            }
+
+            return answers;
+        }
+
+        async function submitSurvey(data) {
+            const query = `
+                mutation SubmitSurvey($data: SubmitSurveyInput!) {
+                    submitSurvey(data: $data) {
+                        ok
+                        message
+                        submission {
+                            id
+                            respondentName
+                            submittedAt
+                        }
+                    }
+                }
+            `;
+
+            const response = await fetch('/graphql/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query,
+                    variables: { data }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Сервер вернул ошибку ' + response.status + '.');
+            }
+
+            const payload = await response.json();
+
+            if (payload.errors && payload.errors.length > 0) {
+                throw new Error(payload.errors[0].message || 'Ошибка выполнения GraphQL-запроса.');
+            }
+
+            return payload.data.submitSurvey;
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            messageBox.classList.add('hidden');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Отправка...';
+
+            try {
+                const data = {
+                    surveySlug: surveySlugValue,
+                    respondentName: document.getElementById('respondent_name').value.trim() || null,
+                    respondentEmail: document.getElementById('respondent_email').value.trim() || null,
+                    metadata: {
+                        source: 'web_form'
+                    },
+                    answers: collectAnswers()
+                };
+
+                const result = await submitSurvey(data);
+
+                if (!result.ok) {
+                    throw new Error(result.message || 'Не удалось отправить ответы.');
+                }
+
+                const submissionId = result.submission ? result.submission.id : '';
+                window.location.href = `/surveys/${surveySlugValue}/success/?submission_id=${encodeURIComponent(submissionId)}`;
+            } catch (error) {
+                showMessage(error.message || 'Произошла ошибка при отправке формы.');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Отправить ответы';
+            }
+        });
+    </script>
+</body>
+</html>
